@@ -38,6 +38,8 @@ type Builder struct {
 
 	encoder encoder
 	opts    *BuilderOpts
+
+	builderNodePool *builderNodePool
 }
 
 const noneAddr = 1
@@ -49,11 +51,13 @@ func newBuilder(w io.Writer, opts *BuilderOpts) (*Builder, error) {
 	if opts == nil {
 		opts = defaultBuilderOpts
 	}
+	builderNodePool := &builderNodePool{}
 	rv := &Builder{
-		unfinished: newUnfinishedNodes(opts),
-		registry:   newRegistry(opts.RegistryTableSize, opts.RegistryMRUSize),
-		opts:       opts,
-		lastAddr:   noneAddr,
+		unfinished:      newUnfinishedNodes(builderNodePool, opts),
+		registry:        newRegistry(builderNodePool, opts.RegistryTableSize, opts.RegistryMRUSize),
+		builderNodePool: builderNodePool,
+		opts:            opts,
+		lastAddr:        noneAddr,
 	}
 
 	var err error
@@ -179,6 +183,8 @@ type unfinishedNodes struct {
 	// this means calls get() and pushXYZ() must be paired,
 	// as well as calls put() and popXYZ()
 	cache []builderNodeUnfinished
+
+	builderNodePool *builderNodePool
 }
 
 func (u *unfinishedNodes) Reset() {
@@ -189,14 +195,15 @@ func (u *unfinishedNodes) Reset() {
 	u.pushEmpty(false)
 }
 
-func newUnfinishedNodes(opts *BuilderOpts) *unfinishedNodes {
+func newUnfinishedNodes(builderNodePool *builderNodePool, opts *BuilderOpts) *unfinishedNodes {
 	initialSize := opts.UnfinishedNodesStackSize
 	if initialSize <= 0 {
 		initialSize = defaultBuilderOpts.UnfinishedNodesStackSize
 	}
 	rv := &unfinishedNodes{
-		stack: make([]*builderNodeUnfinished, 0, initialSize),
-		cache: make([]builderNodeUnfinished, initialSize),
+		stack:           make([]*builderNodeUnfinished, 0, initialSize),
+		cache:           make([]builderNodeUnfinished, initialSize),
+		builderNodePool: builderNodePool,
 	}
 	rv.pushEmpty(false)
 	return rv
@@ -251,7 +258,8 @@ func (u *unfinishedNodes) findCommonPrefixAndSetOutput(key []byte,
 
 func (u *unfinishedNodes) pushEmpty(final bool) {
 	next := u.get()
-	next.node = &builderNode{final: final}
+	next.node = u.builderNodePool.Get()
+	next.node.final = final
 	u.stack = append(u.stack, next)
 }
 
@@ -303,7 +311,7 @@ func (u *unfinishedNodes) addSuffix(bs []byte, out uint64) {
 	u.stack[last].lastOut = out
 	for _, b := range bs[1:] {
 		next := u.get()
-		next.node = &builderNode{}
+		next.node = u.builderNodePool.Get()
 		next.hasLastT = true
 		next.lastIn = b
 		next.lastOut = 0
@@ -325,12 +333,11 @@ func (b *builderNodeUnfinished) lastCompiled(addr int) {
 		transOut := b.lastOut
 		b.hasLastT = false
 		b.lastOut = 0
-		b.node.trans = append(b.node.trans,
-			&transition{
-				in:   transIn,
-				out:  transOut,
-				addr: addr,
-			})
+		b.node.trans = append(b.node.trans, transition{
+			in:   transIn,
+			out:  transOut,
+			addr: addr,
+		})
 	}
 }
 
@@ -338,8 +345,8 @@ func (b *builderNodeUnfinished) addOutputPrefix(prefix uint64) {
 	if b.node.final {
 		b.node.finalOutput = outputCat(prefix, b.node.finalOutput)
 	}
-	for _, t := range b.node.trans {
-		t.out = outputCat(prefix, t.out)
+	for i := range b.node.trans {
+		b.node.trans[i].out = outputCat(prefix, b.node.trans[i].out)
 	}
 	if b.hasLastT {
 		b.lastOut = outputCat(prefix, b.lastOut)
@@ -348,8 +355,22 @@ func (b *builderNodeUnfinished) addOutputPrefix(prefix uint64) {
 
 type builderNode struct {
 	finalOutput uint64
-	trans       []*transition
+	trans       []transition
 	final       bool
+
+	// intrusive linked list
+	next *builderNode
+}
+
+// reset resets the receiver builderNode to a re-usable state.
+func (n *builderNode) reset() {
+	n.final = false
+	n.finalOutput = 0
+	for i := range n.trans {
+		n.trans[i] = emptyTransition
+	}
+	n.trans = n.trans[:0]
+	n.next = nil
 }
 
 func (n *builderNode) equiv(o *builderNode) bool {
@@ -377,6 +398,8 @@ func (n *builderNode) equiv(o *builderNode) bool {
 	return true
 }
 
+var emptyTransition = transition{}
+
 type transition struct {
 	out  uint64
 	addr int
@@ -396,4 +419,27 @@ func outputSub(l, r uint64) uint64 {
 
 func outputCat(l, r uint64) uint64 {
 	return l + r
+}
+
+// singly linked list of builderNodes
+type builderNodePool struct {
+	head *builderNode
+}
+
+func (p *builderNodePool) Get() *builderNode {
+	if p.head == nil {
+		return &builderNode{}
+	}
+	head := p.head
+	p.head = p.head.next
+	return head
+}
+
+func (p *builderNodePool) Put(v *builderNode) {
+	if v == nil {
+		return
+	}
+	v.reset()
+	v.next = p.head
+	p.head = v
 }
