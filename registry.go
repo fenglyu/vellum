@@ -21,15 +21,17 @@ import (
 )
 
 func init() {
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			printRegistryStats()
+		for {
+			select {
+			case <-ticker.C:
+				printRegistryStats()
+			}
 		}
-	}
+	}()
 }
 
 var (
