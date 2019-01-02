@@ -17,6 +17,7 @@ package vellum
 import (
 	"bytes"
 	"io"
+	"sync/atomic"
 )
 
 var defaultBuilderOpts = &BuilderOpts{
@@ -427,7 +428,9 @@ type builderNodePool struct {
 }
 
 func (p *builderNodePool) Get() *builderNode {
+	atomic.AddUint32(&getBuilderNode, 1)
 	if p.head == nil {
+		atomic.AddUint32(&allocBuilderNode, 1)
 		return &builderNode{}
 	}
 	head := p.head
@@ -439,6 +442,7 @@ func (p *builderNodePool) Put(v *builderNode) {
 	if v == nil {
 		return
 	}
+	atomic.AddUint32(&putBuilderNode, 1)
 	v.reset()
 	v.next = p.head
 	p.head = v

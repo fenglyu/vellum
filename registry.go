@@ -14,6 +14,37 @@
 
 package vellum
 
+import (
+	"fmt"
+	"sync/atomic"
+	"time"
+)
+
+func init() {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			printRegistryStats()
+		}
+	}
+}
+
+var (
+	allocBuilderNode uint32
+	getBuilderNode   uint32
+	putBuilderNode   uint32
+)
+
+func printRegistryStats() {
+	fmt.Printf("!! vellum registry stats\n")
+	fmt.Printf("!! get: %d\n", atomic.LoadUint32(&getBuilderNode))
+	fmt.Printf("!! put: %d\n", atomic.LoadUint32(&putBuilderNode))
+	fmt.Printf("!! alloc: %d\n", atomic.LoadUint32(&allocBuilderNode))
+}
+
 type registryCell struct {
 	addr int
 	node *builderNode
