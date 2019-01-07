@@ -144,62 +144,62 @@ func insertStringMap(b *Builder, m map[string]uint64) error {
 	return nil
 }
 
-func TestBuilderNodeEquiv(t *testing.T) {
-	tests := []struct {
-		desc string
-		a    *builderNode
-		b    *builderNode
-		want bool
-	}{
-		{
-			"both states final",
-			&builderNode{
-				final: true,
-			},
-			&builderNode{
-				final: true,
-			},
-			true,
-		},
-		{
-			"both states final, different final val",
-			&builderNode{
-				final:       true,
-				finalOutput: 7,
-			},
-			&builderNode{
-				final:       true,
-				finalOutput: 9,
-			},
-			false,
-		},
-		{
-			"both states final, same transitions, but different trans val",
-			&builderNode{
-				final: true,
-				trans: []transition{
-					{in: 'a', out: 7},
-				},
-			},
-			&builderNode{
-				final: true,
-				trans: []transition{
-					{in: 'a', out: 9},
-				},
-			},
-			false,
-		},
-	}
+// func TestBuilderNodeEquiv(t *testing.T) {
+// 	tests := []struct {
+// 		desc string
+// 		a    *builderNode
+// 		b    *builderNode
+// 		want bool
+// 	}{
+// 		{
+// 			"both states final",
+// 			&builderNode{
+// 				final: true,
+// 			},
+// 			&builderNode{
+// 				final: true,
+// 			},
+// 			true,
+// 		},
+// 		{
+// 			"both states final, different final val",
+// 			&builderNode{
+// 				final:       true,
+// 				finalOutput: 7,
+// 			},
+// 			&builderNode{
+// 				final:       true,
+// 				finalOutput: 9,
+// 			},
+// 			false,
+// 		},
+// 		{
+// 			"both states final, same transitions, but different trans val",
+// 			&builderNode{
+// 				final: true,
+// 				trans: []transition{
+// 					{in: 'a', out: 7},
+// 				},
+// 			},
+// 			&builderNode{
+// 				final: true,
+// 				trans: []transition{
+// 					{in: 'a', out: 9},
+// 				},
+// 			},
+// 			false,
+// 		},
+// 	}
 
-	for _, test := range tests {
-		t.Run(test.desc, func(t *testing.T) {
-			got := test.a.equiv(test.b)
-			if got != test.want {
-				t.Errorf("wanted: %t, got: %t", test.want, got)
-			}
-		})
-	}
-}
+// 	for _, test := range tests {
+// 		t.Run(test.desc, func(t *testing.T) {
+// 			got := test.a.equiv(test.b)
+// 			if got != test.want {
+// 				t.Errorf("wanted: %t, got: %t", test.want, got)
+// 			}
+// 		})
+// 	}
+// }
 
 func loadWords(path string) ([]string, error) {
 	var rv []string

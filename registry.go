@@ -75,9 +75,7 @@ func (r *registry) hash(b *builderNode) int {
 	h = (h ^ final) * fnvPrime
 	h = (h ^ b.finalOutput) * fnvPrime
 	for _, t := range b.trans {
-		h = (h ^ uint64(t.in)) * fnvPrime
-		h = (h ^ t.out) * fnvPrime
-		h = (h ^ uint64(t.addr)) * fnvPrime
+		h = (h ^ uint64(t)) * fnvPrime
 	}
 	return int(h % uint64(r.tableSize))
 }

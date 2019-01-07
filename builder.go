@@ -16,6 +16,7 @@ package vellum
 
 import (
 	"bytes"
+	"encoding/binary"
 	"io"
 )
 
@@ -160,7 +161,7 @@ func (b *Builder) compileFrom(iState int) error {
 }
 
 func (b *Builder) compile(node *builderNode) (int, error) {
-	if node.final && len(node.trans) == 0 &&
+	if node.final && node.numTrans == 0 &&
 		node.finalOutput == 0 {
 		// We're done with this node so its safe to put it back in the pool.
 		b.builderNodePool.Put(node)
@@ -344,10 +345,11 @@ func (b *builderNodeUnfinished) lastCompiled(addr int) {
 		transOut := b.lastOut
 		b.hasLastT = false
 		b.lastOut = 0
-		b.node.trans = append(b.node.trans, transition{
-			in:   transIn,
+
+		b.node.addTransition(transition{
 			out:  transOut,
 			addr: addr,
+			in:   transIn,
 		})
 	}
 }
@@ -356,8 +358,8 @@ func (b *builderNodeUnfinished) addOutputPrefix(prefix uint64) {
 	if b.node.final {
 		b.node.finalOutput = outputCat(prefix, b.node.finalOutput)
 	}
-	for i := range b.node.trans {
-		b.node.trans[i].out = outputCat(prefix, b.node.trans[i].out)
+	for i := 0; i < b.node.numTrans; i++ {
+		b.node.setOut(i, outputCat(prefix, b.node.transition(i).out))
 	}
 	if b.hasLastT {
 		b.lastOut = outputCat(prefix, b.lastOut)
@@ -366,21 +368,55 @@ func (b *builderNodeUnfinished) addOutputPrefix(prefix uint64) {
 
 type builderNode struct {
 	finalOutput uint64
-	trans       []transition
-	final       bool
+
+	// trans is a []transition custom encoded in binary as []byte
+	// so that two nodes transitions can be compared very quickly
+	// using bytes.Equal.
+	trans    []byte
+	numTrans int
+
+	t     transition
+	final bool
 
 	// intrusive linked list
 	next *builderNode
+}
+
+func (b *builderNode) addTransition(t transition) {
+	start := 0
+	if len(b.trans) > 0 {
+		start = len(b.trans)
+	}
+	b.trans = append(b.trans, make([]byte, 17)...)
+	binary.LittleEndian.PutUint64(b.trans[start:], t.out)
+	binary.LittleEndian.PutUint64(b.trans[start+8:], uint64(t.addr))
+	b.trans[start+16] = t.in
+	b.numTrans++
+}
+
+func (b *builderNode) transition(i int) transition {
+	startByte := i * (8*2 + 1) // 2 * uint64 + one byte
+	return transition{
+		out:  binary.LittleEndian.Uint64(b.trans[startByte:]),
+		addr: int(binary.LittleEndian.Uint64(b.trans[startByte+8:])),
+		in:   b.trans[startByte+16],
+	}
+}
+
+func (b *builderNode) setOut(i int, out uint64) {
+	startByte := i * (8*2 + 1) // 2 * uint64 + one byte
+	binary.LittleEndian.PutUint64(b.trans[startByte:], out)
 }
 
 // reset resets the receiver builderNode to a re-usable state.
 func (n *builderNode) reset() {
 	n.final = false
 	n.finalOutput = 0
-	for i := range n.trans {
-		n.trans[i] = emptyTransition
+	for i := 0; i < n.numTrans; i++ {
+		n.trans[i] = 0
 	}
 	n.trans = n.trans[:0]
+	n.numTrans = 0
 	n.next = nil
 }
 
@@ -391,22 +427,7 @@ func (n *builderNode) equiv(o *builderNode) bool {
 	if n.finalOutput != o.finalOutput {
 		return false
 	}
-	if len(n.trans) != len(o.trans) {
-		return false
-	}
-	for i, ntrans := range n.trans {
-		otrans := o.trans[i]
-		if ntrans.in != otrans.in {
-			return false
-		}
-		if ntrans.addr != otrans.addr {
-			return false
-		}
-		if ntrans.out != otrans.out {
-			return false
-		}
-	}
-	return true
+	return bytes.Equal(n.trans, o.trans)
 }
 
 var emptyTransition = transition{}
@@ -469,9 +490,7 @@ func newBuilderNodePool(config BuilderNodePoolingConfig) *builderNodePool {
 
 func (p *builderNodePool) Get() *builderNode {
 	if p.head == nil {
-		return &builderNode{
-			trans: make([]transition, 0, 10),
-		}
+		return &builderNode{}
 	}
 	head := p.head
 	p.head = p.head.next
