@@ -100,8 +100,10 @@ func (r registryCache) entry(node *builderNode, pool *builderNodePool) (bool, in
 		r[0].node = node
 		return false, 0, &r[0]
 	}
+
 	for i := range r {
 		if r[i].node != nil {
+			// Check if two nodes are equivalent.
 			if r[i].node.final != node.final {
 				continue
 			}
@@ -111,15 +113,12 @@ func (r registryCache) entry(node *builderNode, pool *builderNodePool) (bool, in
 			if !bytes.Equal(r[i].node.trans, node.trans) {
 				continue
 			}
+
+			// If we made it this far then they are equivalent.
 			addr := r[i].addr
 			r.promote(i)
 			return true, addr, nil
 		}
-		// if r[i].node != nil && r[i].node.equiv(node) {
-		// addr := r[i].addr
-		// r.promote(i)
-		// return true, addr, nil
-		// }
 	}
 
 	// no match
