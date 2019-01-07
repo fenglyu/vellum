@@ -377,6 +377,9 @@ type builderNode struct {
 	// using bytes.Equal.
 	trans    []byte
 	numTrans int
+	// transitionBuffer is used to avoid allocating a slice everytime
+	// we need to grow trans.
+	transitionBuffer []byte
 
 	t     transition
 	final bool
@@ -386,14 +389,20 @@ type builderNode struct {
 }
 
 func (b *builderNode) addTransition(t transition) {
-	start := 0
-	if len(b.trans) > 0 {
-		start = len(b.trans)
+	if b.transitionBuffer == nil {
+		b.transitionBuffer = make([]byte, 17)
 	}
-	b.trans = append(b.trans, make([]byte, 17)...)
-	binary.LittleEndian.PutUint64(b.trans[start:], t.out)
-	binary.LittleEndian.PutUint64(b.trans[start+8:], uint64(t.addr))
-	b.trans[start+16] = t.in
+	if cap(b.transitionBuffer) > 17 {
+		panic(b.transitionBuffer)
+	}
+	for i := range b.transitionBuffer {
+		b.transitionBuffer[i] = 0
+	}
+	binary.LittleEndian.PutUint64(b.transitionBuffer, t.out)
+	binary.LittleEndian.PutUint64(b.transitionBuffer[8:], uint64(t.addr))
+	b.transitionBuffer[16] = t.in
+
+	b.trans = append(b.trans, b.transitionBuffer...)
 	b.numTrans++
 }
 
@@ -493,7 +502,9 @@ func newBuilderNodePool(config BuilderNodePoolingConfig) *builderNodePool {
 
 func (p *builderNodePool) Get() *builderNode {
 	if p.head == nil {
-		return &builderNode{}
+		return &builderNode{
+			trans: make([]byte, 0, 1000),
+		}
 	}
 	head := p.head
 	p.head = p.head.next
