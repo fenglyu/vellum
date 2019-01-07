@@ -425,18 +425,6 @@ func (b *builderNode) setOut(i int, out uint64) {
 	binary.LittleEndian.PutUint64(b.trans[startByte:], out)
 }
 
-// reset resets the receiver builderNode to a re-usable state.
-func (n *builderNode) reset() {
-	n.final = false
-	n.finalOutput = 0
-	for i := 0; i < n.numTrans; i++ {
-		n.trans[i] = 0
-	}
-	n.trans = n.trans[:0]
-	n.numTrans = 0
-	n.next = nil
-}
-
 func (n *builderNode) equiv(o *builderNode) bool {
 	if n.final != o.final {
 		return false
@@ -523,7 +511,13 @@ func (p *builderNodePool) Put(v *builderNode) {
 		return
 	}
 
-	v.reset()
+	// n.reset() -- manually inlined to remove function call overhead.
+	v.final = false
+	v.finalOutput = 0
+	v.trans = v.trans[:0]
+	v.numTrans = 0
+	v.next = nil
+
 	v.next = p.head
 	p.head = v
 	p.size++
