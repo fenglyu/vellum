@@ -402,6 +402,11 @@ func (b *builderNode) addTransition(t transition) {
 	binary.LittleEndian.PutUint64(b.transitionBuffer[8:], uint64(t.addr))
 	b.transitionBuffer[16] = t.in
 
+	if len(b.trans)+17 > cap(b.trans) {
+		old := b.trans
+		b.trans = make([]byte, len(old), 2*cap(old))
+		copy(b.trans, old)
+	}
 	b.trans = append(b.trans, b.transitionBuffer...)
 	b.numTrans++
 }
@@ -502,9 +507,7 @@ func newBuilderNodePool(config BuilderNodePoolingConfig) *builderNodePool {
 
 func (p *builderNodePool) Get() *builderNode {
 	if p.head == nil {
-		return &builderNode{
-			trans: make([]byte, 0, 1000),
-		}
+		return &builderNode{}
 	}
 	head := p.head
 	p.head = p.head.next

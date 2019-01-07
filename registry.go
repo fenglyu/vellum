@@ -14,6 +14,8 @@
 
 package vellum
 
+import "bytes"
+
 type registryCell struct {
 	addr int
 	node *builderNode
@@ -74,8 +76,15 @@ func (r *registry) hash(b *builderNode) int {
 	var h uint64 = 14695981039346656037
 	h = (h ^ final) * fnvPrime
 	h = (h ^ b.finalOutput) * fnvPrime
-	for _, t := range b.trans {
-		h = (h ^ uint64(t)) * fnvPrime
+	// for _, t := range b.trans {
+
+	// 	h = (h ^ uint64(t)) * fnvPrime
+	// }
+	for i := 0; i < b.numTrans; i++ {
+		t := b.transition(i)
+		h = (h ^ uint64(t.in)) * fnvPrime
+		h = (h ^ t.out) * fnvPrime
+		h = (h ^ uint64(t.addr)) * fnvPrime
 	}
 	return int(h % uint64(r.tableSize))
 }
@@ -96,11 +105,25 @@ func (r registryCache) entry(node *builderNode, pool *builderNodePool) (bool, in
 		return false, 0, &r[0]
 	}
 	for i := range r {
-		if r[i].node != nil && r[i].node.equiv(node) {
+		if r[i].node != nil {
+			if r[i].node.final != node.final {
+				continue
+			}
+			if r[i].node.finalOutput != node.finalOutput {
+				continue
+			}
+			if !bytes.Equal(r[i].node.trans, node.trans) {
+				continue
+			}
 			addr := r[i].addr
 			r.promote(i)
 			return true, addr, nil
 		}
+		// if r[i].node != nil && r[i].node.equiv(node) {
+		// addr := r[i].addr
+		// r.promote(i)
+		// return true, addr, nil
+		// }
 	}
 
 	// no match
