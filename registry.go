@@ -76,10 +76,6 @@ func (r *registry) hash(b *builderNode) int {
 	var h uint64 = 14695981039346656037
 	h = (h ^ final) * fnvPrime
 	h = (h ^ b.finalOutput) * fnvPrime
-	// for _, t := range b.trans {
-
-	// 	h = (h ^ uint64(t)) * fnvPrime
-	// }
 	for i := 0; i < b.numTrans; i++ {
 		t := b.transition(i)
 		h = (h ^ uint64(t.in)) * fnvPrime
