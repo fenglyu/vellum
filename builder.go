@@ -361,9 +361,7 @@ func (b *builderNodeUnfinished) addOutputPrefix(prefix uint64) {
 	if b.node.final {
 		b.node.finalOutput = outputCat(prefix, b.node.finalOutput)
 	}
-	for i := 0; i < b.node.numTrans; i++ {
-		b.node.setOut(i, outputCat(prefix, b.node.transition(i).out))
-	}
+	b.node.setOut(prefix)
 	if b.hasLastT {
 		b.lastOut = outputCat(prefix, b.lastOut)
 	}
@@ -420,9 +418,12 @@ func (b *builderNode) transition(i int) transition {
 	}
 }
 
-func (b *builderNode) setOut(i int, out uint64) {
-	startByte := i * (8*2 + 1) // 2 * uint64 + one byte
-	binary.LittleEndian.PutUint64(b.trans[startByte:], out)
+func (b *builderNode) setOut(prefix uint64) {
+	for i := 0; i < b.numTrans; i++ {
+		startByte := i * (8*2 + 1) // 2 * uint64 + one byte
+		out := binary.LittleEndian.Uint64(b.trans[startByte:])
+		binary.LittleEndian.PutUint64(b.trans[startByte:], outputCat(prefix, out))
+	}
 }
 
 func (n *builderNode) equiv(o *builderNode) bool {
