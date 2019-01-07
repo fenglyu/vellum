@@ -18,7 +18,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"unsafe"
 )
+
+var transitionSize = int(unsafe.Sizeof(transition{}))
 
 var defaultBuilderOpts = &BuilderOpts{
 	Encoder:           1,
@@ -501,7 +504,7 @@ func (p *builderNodePool) Get() *builderNode {
 func (p *builderNodePool) Put(v *builderNode) {
 	if v == nil ||
 		p.size >= p.config.MaxSize ||
-		cap(v.trans) > p.config.MaxTransitionSize {
+		cap(v.trans) > p.config.MaxTransitionSize*transitionSize {
 		// Don't store nil or allow the pool to violate its config.
 		return
 	}
