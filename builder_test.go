@@ -101,7 +101,15 @@ func TestBuilderSharedPrefix(t *testing.T) {
 	}
 }
 
-func randomValues(list []string) []uint64 {
+func randomValues(n int) []uint64 {
+	rv := make([]uint64, n)
+	for i := 0; i < n; i++ {
+		rv[i] = uint64(rand.Uint64())
+	}
+	return rv
+}
+
+func randomByteValues(list [][]byte) []uint64 {
 	rv := make([]uint64, len(list))
 	for i := range list {
 		rv[i] = uint64(rand.Uint64())
@@ -109,9 +117,27 @@ func randomValues(list []string) []uint64 {
 	return rv
 }
 
+func stringListToByteList(list []string) [][]byte {
+	rv := make([][]byte, len(list))
+	for i, s := range list {
+		rv[i] = []byte(s)
+	}
+	return rv
+}
+
 func insertStrings(b *Builder, list []string, vals []uint64) error {
 	for i, item := range list {
 		err := b.Insert([]byte(item), vals[i])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func insertBytes(b *Builder, list [][]byte, vals []uint64) error {
+	for i, item := range list {
+		err := b.Insert(item, vals[i])
 		if err != nil {
 			return err
 		}
@@ -233,8 +259,8 @@ func loadWords(path string) ([]string, error) {
 var thousandTestWords []string
 
 func BenchmarkBuilder(b *testing.B) {
-	dataset := thousandTestWords
-	randomThousandVals := randomValues(dataset)
+	dataset := stringListToByteList(thousandTestWords)
+	randomThousandVals := randomValues(len(dataset))
 
 	b.ResetTimer()
 
@@ -244,7 +270,7 @@ func BenchmarkBuilder(b *testing.B) {
 	}
 	for i := 0; i < b.N; i++ {
 		builder.Reset(ioutil.Discard)
-		err = insertStrings(builder, dataset, randomThousandVals)
+		err = insertBytes(builder, dataset, randomThousandVals)
 		if err != nil {
 			b.Fatalf("error inserting thousand words: %v", err)
 		}

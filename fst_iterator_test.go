@@ -487,7 +487,7 @@ var val uint64
 func BenchmarkFSTIteratorAllInMem(b *testing.B) {
 	// first build the FST once
 	dataset := thousandTestWords
-	randomThousandVals := randomValues(dataset)
+	randomThousandVals := randomValues(len(dataset))
 	var buf bytes.Buffer
 	builder, err := New(&buf, nil)
 	if err != nil {

@@ -191,7 +191,7 @@ func testRoundTripThousand(t *testing.T, b *Builder) {
 	b.Reset(f)
 
 	dataset := thousandTestWords
-	randomThousandVals := randomValues(dataset)
+	randomThousandVals := randomValues(len(dataset))
 
 	err = insertStrings(b, dataset, randomThousandVals)
 	if err != nil {
