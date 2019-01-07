@@ -132,11 +132,7 @@ func (r registryCache) entry(node *builderNode, pool *builderNodePool) (bool, in
 
 func (r registryCache) promote(i int) {
 	for i > 0 {
-		r.swap(i-1, i)
+		r[i-1], r[i] = r[i], r[i-1]
 		i--
 	}
-}
-
-func (r registryCache) swap(i, j int) {
-	r[i], r[j] = r[j], r[i]
 }
